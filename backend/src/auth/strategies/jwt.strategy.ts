@@ -14,14 +14,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private usersRepository: Repository<User>,
   ) {
     const secret = configService.get<string>('JWT_SECRET');
-    if (!secret) {
+    const isProduction = configService.get<string>('NODE_ENV') === 'production';
+    if (!secret && isProduction) {
       throw new Error('JWT_SECRET must be configured before the backend starts.');
     }
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret,
+      secretOrKey: secret || 'local-development-only-secret-change-me',
     });
   }
 
