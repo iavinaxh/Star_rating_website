@@ -15,10 +15,17 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET', 'super-secret-store-rating-key-2026-xyz'),
-        signOptions: { expiresIn: '1d' },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>('JWT_SECRET');
+        if (!secret && configService.get<string>('NODE_ENV') === 'production') {
+          throw new Error('JWT_SECRET must be configured in production.');
+        }
+
+        return {
+          secret: secret || 'local-development-only-secret-change-me',
+          signOptions: { expiresIn: '1d' },
+        };
+      },
     }),
   ],
   controllers: [AuthController],
