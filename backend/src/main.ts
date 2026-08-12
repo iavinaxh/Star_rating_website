@@ -6,7 +6,6 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 
 async function bootstrap() {
-  // Load environment variables manually for early DB creation
   dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
   const logger = new Logger('DatabaseBootstrap');
@@ -27,28 +26,21 @@ async function bootstrap() {
     await connection.end();
     logger.log(`Database "${dbName}" checked/created successfully.`);
   } catch (error: any) {
-    logger.error('===================================================================');
-    logger.error(`DATABASE INITIALIZATION ERROR: Could not connect to MySQL at ${dbHost}:${dbPort}`);
-    logger.error(`Error details: ${error.message}`);
-    logger.error('Please make sure:');
-    logger.error('1. Your MySQL server is running.');
-    logger.error('2. The password in backend/.env is correct.');
-    logger.error('Once verified, the application will automatically create the tables.');
-    logger.error('-------------------------------------------------------------------');
-    logger.warn('⚠️ FALLING BACK TO LOCAL SQLITE DATABASE FOR SEAMLESS RUNTIME ⚠️');
-    logger.error('===================================================================');
+    logger.warn(`MySQL unavailable. Using SQLite fallback. ${error.message}`);
     process.env.DB_FALLBACK_SQLITE = 'true';
   }
 
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS
+  const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',')
+    : ['http://localhost:5173'];
+
   app.enableCors({
-    origin: true, // Allow all origins for testing
+    origin: allowedOrigins,
     credentials: true,
   });
 
-  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -59,6 +51,6 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`Backend Server is running on: http://localhost:${port}`);
+  console.log(`Backend Server running on port ${port}`);
 }
 bootstrap();
