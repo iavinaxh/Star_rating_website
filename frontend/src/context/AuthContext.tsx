@@ -20,6 +20,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || 'https://iucbghwudabbcofsuxpz.supabase.co/functions/v1/store-rating-auth';
+const AUTH_ENDPOINTS = new Set(['/api/auth/register', '/api/auth/login']);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -57,7 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-    const url = endpoint.startsWith('http') ? endpoint : `${API_URL}${endpoint}`;
+    const baseUrl = AUTH_ENDPOINTS.has(endpoint) ? AUTH_API_URL : API_URL;
+    const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint.replace('/api/auth/register', '/register').replace('/api/auth/login', '/login')}`;
 
     const headers = new Headers(options.headers || {});
     if (token) {
@@ -73,15 +76,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       headers,
     });
 
-    if (response.status === 401) {
-      logout();
-      throw new Error('Session expired. Please log in again.');
+    const text = await response.text();
+    let data: any = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { message: text || 'Unexpected server response' };
     }
 
-    const data = await response.json();
+    if (response.status === 401) {
+      logout();
+      throw new Error(data.message || 'Session expired. Please log in again.');
+    }
 
     if (!response.ok) {
-      throw new Error(data.message || 'Something went wrong');
+      const message = Array.isArray(data.message) ? data.message.join(', ') : data.message;
+      throw new Error(message || 'Something went wrong');
     }
 
     return data;
