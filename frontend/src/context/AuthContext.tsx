@@ -22,6 +22,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || 'https://iucbghwudabbcofsuxpz.supabase.co/functions/v1/store-rating-auth';
 const AUTH_ENDPOINTS = new Set(['/api/auth/register', '/api/auth/login']);
+const HOSTED_API_URL = AUTH_API_URL;
+
+const isHostedApiEndpoint = (endpoint: string) =>
+  endpoint.startsWith('/api/stores') ||
+  endpoint.startsWith('/api/ratings') ||
+  endpoint === '/api/auth/update-password';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -59,8 +65,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-    const baseUrl = AUTH_ENDPOINTS.has(endpoint) ? AUTH_API_URL : API_URL;
-    const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint.replace('/api/auth/register', '/register').replace('/api/auth/login', '/login')}`;
+    const isAuthEndpoint = AUTH_ENDPOINTS.has(endpoint);
+    const useHostedApi = isAuthEndpoint || isHostedApiEndpoint(endpoint);
+    const baseUrl = useHostedApi ? HOSTED_API_URL : API_URL;
+
+    let path = endpoint;
+    if (isAuthEndpoint) {
+      path = endpoint.replace('/api/auth/register', '/register').replace('/api/auth/login', '/login');
+    } else if (isHostedApiEndpoint(endpoint)) {
+      path = endpoint.replace(/^\/api\//, '/');
+    }
+
+    const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${path}`;
 
     const headers = new Headers(options.headers || {});
     if (token) {
